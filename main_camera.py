@@ -1,5 +1,7 @@
 import cv2
 import sys
+import requests 
+from RPi_API_Interface import * 
 
 # Camera Imports
 from picamera.array import PiRGBArray
@@ -10,10 +12,10 @@ from time import sleep
 
 # Get user supplied values
 # path to cascade file is first argument to script
-cascPath = sys.argv[1]
+#cascPath = sys.argv[1]
 
 # Create the haar cascade
-face_cascade = cv2.CascadeClassifier(cascPath)
+#face_cascade = cv2.CascadeClassifier(cascPath)
 
 # Capture Object
 camera = PiCamera()
@@ -28,42 +30,38 @@ sleep(1.0)
 
 counter = 0 
 frame_count = 0 
+
+device = 'b8-27-eb-4f-b9-f6'
+email = raw_input("Email: ") 
+password = raw_input("Password: ")
+
+token = get_token(email, password)['token']
+
+url = 'http://smartplug.host/api/v1/devices/'+device+'/semantic'
+headers = {'Token-Authorization':token} 
+
+
 for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
   print 'frame = ',frame_count
   if frame_count % 30 == 0: 
     fgbg = cv2.BackgroundSubtractorMOG()
     print 'new background'
   frame_count = frame_count + 1
-  # Grab an image from the camera
-  #image = frame.array
- 
-  # Shrink it down
-  #height, width = image.shape[:2]
-  #image = cv2.resize(image,(width/2,height/2),interpolation=cv2.INTER_CUBIC)
- 
-  # Your code here...
-  # Follow the OpenCV tutorial to use their detection algorithms!
-  #gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-  #faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-  #for (x,y,w,h) in faces:
-  #  cv2.rectangle(image,(x,y),(x+w,y+h),(255,0,0),2)
 
   fgmask = fgbg.apply(frame.array)
-  #print 'length of fgmask = ',len(fgmask)
-  #print 'fgmask = ',fgmask
-  #print 'sum of 1s in fgmask = ',sum(fgmask)
   contours, hierarchy = cv2.findContours(fgmask,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
 
   
   for c in contours: 
+    area = cv2.contourArea(c)
     #print 'contour area = ',cv2.contourArea(c)
-    if cv2.contourArea(c) > 300: 
+    if area > 300: 
+      data = {'semantic_label':'movement', 'data':area}
+      resp = requests.post(url, headers=headers, data=data)
+      parsed_json = resp.json()
+      print parsed_json
       print 'MOTION DETECTED ',counter
       counter = counter + 1
-  #print 'contours = ',contours 
-  #cnt = contours[4]
-  #cv2.drawContours(fgmask, contours, -1, (0,255,0), 3)
 
   cv2.imshow('img',fgmask)
 
